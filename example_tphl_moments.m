@@ -1,23 +1,20 @@
-%% TPHL 各阶矩与矩母函数（MGF）示例
+%% TPHL raw moments and moment generating function (MGF)
 %
-% 说明（与老师强调的“亮点”对应）：
-%   - 补充材料 S1 式 (S8): E[V^r] = 截断 PHL 上的原矩
-%   - 补充材料 S1 式 (S9): M_V(t) = E[e^{tV}]  —— 矩母函数
-%   - 在 t=0 处：M_V^{(k)}(0) = E[V^k]（收敛时），故高阶矩不必每次写复杂积分，
-%     也可从 MGF 求导得到；论文同时给出 logistic→Beta 的闭式（S10）。
-%
-% 本脚本用数值积分实现 S8/S9，并对比“直接算原矩”与“MGF 数值求导”。
+% Implements Supplementary Eqs. (S8)-(S9) by numerical quadrature on
+% tphl_pdf, and compares direct raw moments with numerical MGF derivatives
+% at t = 0 (valid for low orders). Closed-form beta forms are given in
+% Supplementary Eq. (S10).
 %
 % Reference: Wang et al. (2026) OLAR, doi:10.34133/olar.0163
 
 clear; clc;
 addpath('tphl_functions');
 
-%% 示例参数（可改成你拟合得到的 alpha, mu, lambda）
+%% Example parameters (replace with MLE estimates if available)
 alpha = 0.35;
 mu    = 2.0;
 lambda = 1.2;
-c_wpd = 0.5 * 1.225;   % WPD 用 c = rho/2
+c_wpd = 0.5 * 1.225;   % WPD: c = rho/2
 
 fprintf('=== TPHL moments & MGF demo ===\n');
 fprintf('alpha=%.4f  mu=%.4f  lambda=%.4f\n\n', alpha, mu, lambda);
@@ -53,8 +50,8 @@ if ~isempty(fieldnames(R.mgf)) && isfield(R.mgf, 'order')
     fprintf('  (k=1,2: direct raw moments vs numerical MGF derivative at t=0; higher k use tphl_raw_moment.)\n');
 end
 
-%% 可选：从 HadISD 拟合后再算矩（需本地 nc 路径）
-% Uncomment and set path if available:
+%% Optional: moments after HadISD fit (set local nc path)
+% Uncomment when data are available:
 % v = ... load windspeeds ...
 % [theta, ~] = tphl_mle(v, seeds, lb, ub, opts);
 % R_site = tphl_moments_report(theta(1), theta(2), theta(3), 'max_r', 12, 'mgf_check', true);
