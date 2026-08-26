@@ -25,8 +25,8 @@ The TPHL distribution addresses limitations of the classical Weibull distributio
 
 - **Three-parameter model**: `α` (tail heaviness), `μ` (location), `λ` (scale)
 - **Physical constraint**: Truncated at v ≥ 0
-- **Analytical tractability**: Closed-form expressions for moments
-- **Wind power statistics**: Direct computation from wind speed parameters
+- **Analytical tractability**: Closed-form raw moments and moment generating function (MGF); see Supplementary S1
+- **Wind power statistics**: Direct computation from wind speed moments (P = c·V³)
 
 ## File Structure
 
@@ -44,11 +44,15 @@ code/
 │   ├── tphl_cdf.m                    # TPHL CDF
 │   ├── tphl_quantile.m               # TPHL quantile function
 │   ├── tphl_mle.m                    # Maximum likelihood estimation
-│   ├── tphl_power_stats.m            # Wind power statistics
+│   ├── tphl_raw_moment.m             # Raw moment E[V^r] (Supp. S8)
+│   ├── tphl_mgf.m                    # Moment generating function M_V(t) (Supp. S9)
+│   ├── tphl_moments_report.m         # Batch moments + speed/power stats
+│   ├── tphl_power_stats.m            # Wind power statistics (legacy helper)
 │   ├── tphl_ks_statistic.m           # Kolmogorov-Smirnov statistic
 │   ├── tphl_aic.m                    # Akaike Information Criterion
 │   └── tphl_bic.m                    # Bayesian Information Criterion
 ├── example_tphl_fitting.m             # Example: Fitting TPHL to data
+├── example_tphl_moments.m             # Example: Raw moments, MGF, power stats
 └── parameter_sensitivity_analysis.m   # Parameter sensitivity analysis
 ```
 
@@ -95,6 +99,42 @@ run('example_tphl_fitting.m');
 
 % Example 2: Parameter sensitivity analysis
 run('parameter_sensitivity_analysis.m');
+
+% Example 3: Raw moments, MGF, and wind-power statistics from fitted parameters
+run('example_tphl_moments.m');
+```
+
+## Moments and Moment Generating Function (MGF)
+
+The TPHL framework provides **analytic access to all raw moments** of wind speed and, by the transform \(P = cV^3\), to wind-power statistics without refitting in the power domain.
+
+| Quantity | Paper reference | Code |
+|----------|-----------------|------|
+| Raw moment \(E[V^r]\) | Main Eq. (7), Supp. (S8) | `tphl_raw_moment` |
+| MGF \(M_V(t)=E[e^{tV}]\) | Supp. (S9) | `tphl_mgf` |
+| Mean, var, skew, kurt of \(V\) | Main Eq. (9)–(12) | `tphl_moments_report` → `.speed` |
+| Mean, var, skew, kurt of \(P\) | Main Eq. (13)–(16) | `tphl_moments_report` → `.power` |
+
+Theory note: at \(t=0\), \(M_V^{(k)}(0)=E[V^k]\) when the MGF exists in a neighborhood of zero. The supplement also gives **incomplete-beta** forms via a logistic–beta change of variables (Supp. S10). This repository evaluates S8/S9 by **adaptive quadrature** on `tphl_pdf` (same approach as `tphl_power_stats`).
+
+```matlab
+addpath('tphl_functions');
+
+% After MLE fit
+[theta, ~] = tphl_mle(v, seeds, lb, ub, opts);
+alpha = theta(1); mu = theta(2); lambda = theta(3);
+
+% All-in-one report (max_r >= 12 for full power kurtosis)
+R = tphl_moments_report(alpha, mu, lambda, ...
+    'max_r', 12, ...
+    'c_power', 0.5 * 1.225, ...   % c = rho/2 for WPD (W/m^2)
+    'mgf_check', true);           % optional: compare E[V^k] vs d^k M/dt^k|_{t=0}
+
+fprintf('E[V] = %.3f m/s, E[P] = %.2f W/m^2\n', R.speed.mean, R.power.meanP);
+
+% Low-level API
+M3 = tphl_raw_moment(alpha, mu, lambda, 3);      % E[V^3] -> mean power / c
+Mv = tphl_mgf(alpha, mu, lambda, 0.01);          % M_V(t) at small t
 ```
 
 ## Core Functions
@@ -112,7 +152,13 @@ run('parameter_sensitivity_analysis.m');
 
 ### Wind Power Statistics
 
-- **`tphl_power_stats(alpha, mu, lambda, c, v0)`**: Compute mean, variance, skewness, and excess kurtosis of wind power (P = c·V³)
+- **`tphl_power_stats(alpha, mu, lambda, c, v0)`**: Compute mean, variance, skewness, and excess kurtosis of wind power (P = c·V³) via numerical integration
+
+### Raw Moments and MGF
+
+- **`tphl_raw_moment(alpha, mu, lambda, r, v0)`**: Raw moment \(E[V^r]\) (Supplementary Eq. S8)
+- **`tphl_mgf(alpha, mu, lambda, t, v0)`**: Moment generating function \(M_V(t)=E[e^{tV}]\) (Supplementary Eq. S9)
+- **`tphl_moments_report(alpha, mu, lambda, ...)`**: Structured report of \(M_1\ldots M_r\), speed shape statistics, power statistics, optional MGF derivative check
 
 ### Goodness-of-Fit
 
